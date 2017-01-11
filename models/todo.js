@@ -1,84 +1,83 @@
-const uuidGenerator = require('uuid/v4')
-const fs = require('fs')
+const mongoose = require( 'mongoose' );
+mongoose.connect( 'mongodb://localhost/todos' );
+mongoose.Promise = global.Promise;
 
-let todos = require('../data.json').todos
+//import schema
+const Todo = require( "../models/todoSchema" )
 
-function save () {
-  const json = JSON.stringify({ todos: todos })
-  fs.writeFileSync('data.json', json, 'utf8')
+const uuidGenerator = require( 'uuid/v4' );
+
+function create( params ) {
+  let successful = false
+  Todo.create( {
+    name: params.name,
+    description: params.description || "Gotta get this done!",
+    completed: params.completed || false
+  }, ( err, user ) => {
+    if ( err )
+      return console.log( err );
+    console.log( user );
+  } )
 }
 
-// CREATE - params should be an object with keys for name, description and completed
-function create (params) {
-  if (typeof params === 'object' && params.name.length >= 5) {
-    let newTodo = {
-      _id: uuidGenerator(),
-      name: params.name,
-      description: params.description || params.name,
-      completed: params.completed || false
-    }
-
-    todos.push(newTodo)
-
-    save()
-    return true
-  } else {
-    return false
-  }
+function list( callback ) {
+  var items = [];
+  Todo.find( {}, ( err, responseFromFind ) => {
+    if ( err ) return console.log( err )
+    items = responseFromFind;
+    callback( items );
+  } )
 }
 
-// READ (list & show)
-function list () {
-  return todos
-}
-function show (id) {
-  for (var i = 0; i < todos.length; i++) {
-    if (id === todos[i]._id) {
-      return todos[i]
-    }
-  }
-  return null
+function show( id, callback ) {
+  Todo.find( {
+    _id: id
+  }, ( err, responseFromFind ) => {
+    if ( err ) return console.log( err );
+    item = responseFromFind;
+    callback( item );
+  } )
 }
 
 // UPDATE - params should be an object with KVPs for the fields to update
-function update (id, params) {
-  let todo = show(id)
+function update( id, params ) {
+  Todo.find( {
+    _id: id
+  }, ( err, responseFromFind ) => {
+    if ( err ) return console.log( err );
+    let oldItem = responseFromFind;
+    console.log("olditem from update is ",oldItem)
+    Todo.update( {
+      _id: id
+    }, {
+      name: params.name || oldItem.name,
+      description: params.description || oldItem.description
+    }, ( err ) => {
+      if ( err ) return console.log( err );
+    } )
+    if ( typeof params.completed !== "undefined" )
+      Todo.update( {
+        _id: id
+      }, {
+        completed: params.completed
+      }, ( err ) => {
+        if ( err ) return console.log( err );
+      } )
+  } )
 
-  if (todo && typeof params === 'object') {
-    if ((params.name && params.name.length < 5) || params.name === '') {
-      return false
-    }
-
-    todo.name = params.name || todo.name
-    todo.description = params.description || todo.description
-    if (typeof params.completed === 'boolean') {
-      todo.completed = params.completed
-    }
-
-    save()
-    return true
-  }
-  return false
 }
 
 // DESTROY (destroy & destroyAll)
-function destroy (id) {
-  for (var i = 0; i < todos.length; i++) {
-    if (id === todos[i]._id) {
-      todos.splice(i, 1)
-
-      save()
-      return true
-    }
-  }
-  return false
+function destroy( id ) {
+  Todo.findByIdAndRemove( id, ( err, item ) => {
+    if ( err ) return console.log( err );
+  } )
 }
 
-function destroyAll () {
-  todos.length = 0
-
-  save()
-  return true
+function destroyAll() {
+  Todo.remove( {}, ( err ) => {
+    if ( err ) return console.log( err );
+  } );
 }
 
 module.exports = {
@@ -88,4 +87,4 @@ module.exports = {
   update: update,
   destroy: destroy,
   destroyAll: destroyAll
-}
+};
